@@ -23,7 +23,7 @@ authRoutes.delete('/delete-user', deleteUser)
 authRoutes.get('/get-user/:id', getUserById)
 authRoutes.post('/follow/:targetUserId', authenticateToken, followUser);
 authRoutes.post('/unfollow/:targetUserId', authenticateToken, unfollowUser);
-authRoutes.get('/:id/followers', getFollowers);
-authRoutes.get('/:id/following', getFollowing);
+authRoutes.get('/followers/:id', getFollowers);
+authRoutes.get('/following/:id', getFollowing);
 
 export default authRoutes

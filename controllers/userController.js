@@ -2,8 +2,6 @@ import User from "../models/Users.js";
 import bcrypt from 'bcryptjs';
 import jwt from "jsonwebtoken";
 import { upload } from "../middlewares/imageMiddleWare.js";
-const { hash, compare } = bcrypt;
-const { sign } = jwt;
 
 //sipn up & create user
 export const createUser = async (req, res) => {
@@ -16,7 +14,7 @@ export const createUser = async (req, res) => {
                 return res.status(400).json({ message: 'Error: No File Selected!' });
             }
             const { username, email, password: plainTextPassword, bio } = req.body;
-            const password = await hash(plainTextPassword, 10);
+            const password = await bcrypt.hash(plainTextPassword, 10);
             const profileImage = req.file.path;
             const user = new User({
                 username,
@@ -41,12 +39,15 @@ export const loginUser = async (req, res) => {
         if (!user) {
             res.status(401).json({ "message": "invalid credentials" });
         }
-        password = await compare(password, user.password)
+        password = await bcrypt.compare(password, user.password)
         if (!password) {
             res.status(401).json({ "message": "invalid credentials" });
         }
-        const token = sign({ user: user._id }, "aurora")
-        res.json({ token:token,user:user.username })
+        const token = jwt.sign(
+            { user: { id: user._id, username: user.username } },
+            "aurora",
+        );
+        res.json({ token: token, user: user.username })
     } catch (error) {
         console.error(error.message)
     }
@@ -106,7 +107,11 @@ export const getUsers = async (req, res) => {
 export const followUser = async (req, res) => {
     try {
         const { targetUserId } = req.params;
-        const userId = req.user.id;
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ message: 'User ID is missing from request.' });
+        }
 
         if (userId === targetUserId) {
             return res.status(400).json({ message: 'You cannot follow yourself.' });
@@ -115,7 +120,11 @@ export const followUser = async (req, res) => {
         const userToFollow = await User.findById(targetUserId);
         const user = await User.findById(userId);
 
-        if (!userToFollow || !user) {
+        if (!userToFollow) {
+            return res.status(404).json({ message: 'User to follow not found.' });
+        }
+
+        if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
@@ -135,6 +144,7 @@ export const followUser = async (req, res) => {
     }
 };
 
+
 export const unfollowUser = async (req, res) => {
     try {
         const { targetUserId } = req.params;
@@ -151,8 +161,8 @@ export const unfollowUser = async (req, res) => {
             return res.status(400).json({ message: 'You are not following this user.' });
         }
 
-        userToUnfollow.followers = userToUnfollow.followers.filter(follower => follower.toString() !== userId);
-        user.following = user.following.filter(following => following.toString() !== targetUserId);
+        userToUnfollow.followers = userToUnfollow.followers.filter(follower => follower.toString() !== userId.toString());
+        user.following = user.following.filter(following => following.toString() !== targetUserId.toString());
 
         await userToUnfollow.save();
         await user.save();
