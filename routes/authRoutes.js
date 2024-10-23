@@ -19,11 +19,11 @@ authRoutes.get('/get-users', getUsers)
 authRoutes.post('/login', loginUser)
 authRoutes.post('/create-user', createUser)
 authRoutes.put('/edit-user/:id', updateUser)
-authRoutes.delete('/delete-user', deleteUser)
+authRoutes.delete('/delete-user/:id', deleteUser)
 authRoutes.get('/get-user/:id', getUserById)
 authRoutes.post('/follow/:targetUserId', authenticateToken, followUser);
 authRoutes.post('/unfollow/:targetUserId', authenticateToken, unfollowUser);
-authRoutes.get('/followers/:id', getFollowers);
-authRoutes.get('/following/:id', getFollowing);
+authRoutes.get('/get-followers/:id', getFollowers);
+authRoutes.get('/get-following/:id', getFollowing);
 
 export default authRoutes

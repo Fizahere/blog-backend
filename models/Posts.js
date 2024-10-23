@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const PostSchema = new mongoose.Schema({
-    author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    author: { type: mongoose.Schema.Types.ObjectId, ref: 'Users', required: true },
     content: { type: String, required: true },
     image: { type: String, default: '' },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Likes' }],

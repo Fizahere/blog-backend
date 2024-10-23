@@ -9,8 +9,8 @@ const app = express();
 connectDb();
 const port = 2000;
 app.use(express.json())
-app.use('/aurora/auth-routes', authRoutes)
-app.use('/aurora/post-routes', postRoutes)
+app.use('/api/auth-routes', authRoutes)
+app.use('/api/post-routes', postRoutes)
 
 
 

@@ -18,8 +18,8 @@ const UserSchema = new mongoose.Schema({
             ref: 'Users'  
         }
     ],
-    posts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
-    notifications: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Notification' }]
+    posts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Posts' }],
+    notifications: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Notifications' }]
 }, { timestamps: true });
 
 const User = mongoose.model('Users', UserSchema);

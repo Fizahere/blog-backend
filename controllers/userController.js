@@ -3,31 +3,48 @@ import bcrypt from 'bcryptjs';
 import jwt from "jsonwebtoken";
 import { upload } from "../middlewares/imageMiddleWare.js";
 
+export const getUsers = async (req, res) => {
+    try {
+        const results = await User.find();
+        return res.status(200).json({ results });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
 //sipn up & create user
 export const createUser = async (req, res) => {
     try {
         upload(req, res, async (err) => {
             if (err) {
-                return res.status(400).json({ message: err.message });
+                return res.status(400).json({ msg: err.message });
             }
             if (!req.file) {
-                return res.status(400).json({ message: 'Error: No File Selected!' });
+                return res.status(400).json({ msg: 'no file selected!' });
             }
             const { username, email, password: plainTextPassword, bio } = req.body;
+            const findUserByUsername = await User.findOne({ username })
+            const findUserByEmail = await User.findOne({ email })
+            if (findUserByUsername) {
+                 res.json({ msg: 'username already exist.' })
+            }
+            if(findUserByEmail){
+                res.json({ msg: 'email already exist.' })
+            }
             const password = await bcrypt.hash(plainTextPassword, 10);
             const profileImage = req.file.path;
-            const user = new User({
+            const results = new User({
                 username,
                 email,
                 password,
                 bio,
                 profileImage,
             });
-            await user.save();
-            res.status(201).json({ msg: 'User created.', user });
+            await results.save();
+            return res.status(201).json({ msg: 'user created.', results });
         });
     } catch (error) {
-        res.status(500).json({ msg: 'Internal server error.', error: error.message });
+        return res.status(500).json({ msg: 'internal server error.', error: error.message });
     }
 };
 
@@ -35,72 +52,71 @@ export const createUser = async (req, res) => {
 export const loginUser = async (req, res) => {
     try {
         let { username, password } = req.body;
-        const user = await User.findOne({ username });
-        if (!user) {
-            res.status(401).json({ "message": "invalid credentials" });
+        const results = await User.findOne({ username });
+        if (!results) {
+            return res.status(401).json({ msg: "invalid credentials" });
         }
-        password = await bcrypt.compare(password, user.password)
+        password = await bcrypt.compare(password, results.password)
         if (!password) {
-            res.status(401).json({ "message": "invalid credentials" });
+            return res.status(401).json({ msg: "invalid credentials" });
         }
         const token = jwt.sign(
-            { user: { id: user._id, username: user.username } },
+            { user: { id: results._id, username: results.username } },
             "aurora",
         );
-        res.json({ token: token, user: user.username })
+        res.json({ token: token, user: results.username })
     } catch (error) {
-        console.error(error.message)
+        res.status(500).json({ msg: 'internal server error.' })
     }
 }
 
 export const getUserById = async (req, res) => {
     try {
-        const user = await User.findById(req.params.id)
-            .populate('followers following posts notifications');
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+        const results = await User.findById(req.params.id).populate('posts notifications');
+        if (!results) {
+            return res.status(404).json({ msg: 'user not found' });
         }
-        res.status(200).json(user);
+        return res.status(200).json({ results });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
 
 export const updateUser = async (req, res) => {
     try {
-        const { username, email, bio } = req.body;
-        const user = await User.findByIdAndUpdate(
-            req.params.id,
-            { username, email, bio },
-            { new: true, runValidators: true }
-        );
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-        res.status(200).json(user);
+        upload(req, res, async (err) => {
+            if (err) {
+                return res.status(400).json({ msg: err.message });
+            }
+            if (!req.file) {
+                return res.status(400).json({ msg: 'no file selected!' });
+            }
+            const { username, email, bio } = req.body;
+            const profileImage = req.file.path;
+            const results = await User.findByIdAndUpdate(
+                req.params.id,
+                { username, email, bio, profileImage },
+                { new: true, runValidators: true }
+            );
+            if (!results) {
+                return res.status(404).json({ msg: 'user not found' });
+            }
+            return res.status(200).json({ msg: 'user updated.', results });
+        });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
     }
 };
 
 export const deleteUser = async (req, res) => {
     try {
-        const user = await User.findByIdAndDelete(req.params.id);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+        const results = await User.findByIdAndDelete(req.params.id);
+        if (!results) {
+            return res.status(404).json({ msg: 'user not found' });
         }
-        res.status(200).json({ message: 'User deleted successfully' });
+        return res.status(200).json({ msg: 'user deleted.' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
-
-export const getUsers = async (req, res) => {
-    try {
-        const users = await User.find();
-        res.status(200).json({ users });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
 
@@ -110,26 +126,26 @@ export const followUser = async (req, res) => {
         const userId = req.user?.id;
 
         if (!userId) {
-            return res.status(401).json({ message: 'User ID is missing from request.' });
+            return res.status(401).json({ msg: 'user id is missing.' });
         }
 
         if (userId === targetUserId) {
-            return res.status(400).json({ message: 'You cannot follow yourself.' });
+            return res.status(400).json({ msg: 'ypu cannot follow yourself.' });
         }
 
         const userToFollow = await User.findById(targetUserId);
         const user = await User.findById(userId);
 
         if (!userToFollow) {
-            return res.status(404).json({ message: 'User to follow not found.' });
+            return res.status(404).json({ msg: 'user to follow not found.' });
         }
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json({ msg: 'user not found.' });
         }
 
         if (userToFollow.followers.includes(userId)) {
-            return res.status(400).json({ message: 'You are already following this user.' });
+            return res.status(400).json({ msg: 'you are already following.' });
         }
 
         userToFollow.followers.push(userId);
@@ -138,9 +154,9 @@ export const followUser = async (req, res) => {
         await userToFollow.save();
         await user.save();
 
-        res.status(200).json({ message: `You are now following ${userToFollow.username}` });
+        return res.status(200).json({ msg: `you are now following ${userToFollow.username}` });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
 
@@ -154,11 +170,11 @@ export const unfollowUser = async (req, res) => {
         const user = await User.findById(userId);
 
         if (!userToUnfollow || !user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json({ msg: 'user not found.' });
         }
 
         if (!userToUnfollow.followers.includes(userId)) {
-            return res.status(400).json({ message: 'You are not following this user.' });
+            return res.status(400).json({ msg: 'you are not following.' });
         }
 
         userToUnfollow.followers = userToUnfollow.followers.filter(follower => follower.toString() !== userId.toString());
@@ -167,38 +183,38 @@ export const unfollowUser = async (req, res) => {
         await userToUnfollow.save();
         await user.save();
 
-        res.status(200).json({ message: `You have unfollowed ${userToUnfollow.username}` });
+        return res.status(200).json({ msg: `you have unfollowed ${userToUnfollow.username}` });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
 
 export const getFollowers = async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await User.findById(id).populate('followers', 'username profileImage');
+        const results = await User.findById(id).populate('followers', 'username profileImage');
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+        if (!results) {
+            return res.status(404).json({ msg: 'user not found.' });
         }
 
-        res.status(200).json(user.followers);
+        return res.status(200).json(results.followers);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
 
 export const getFollowing = async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await User.findById(id).populate('following', 'username profileImage');
+        const results = await User.findById(id).populate('following', 'username profileImage');
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+        if (!results) {
+            return res.status(404).json({ msg: 'user not found.' });
         }
 
-        res.status(200).json(user.following);
+        return res.status(200).json(results.following);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
