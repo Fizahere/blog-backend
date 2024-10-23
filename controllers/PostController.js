@@ -3,10 +3,16 @@ import { upload } from "../middlewares/imageMiddleWare.js";
 
 export const getPosts = async (req, res) => {
     try {
-        const results = await Posts.find();
-      return res.json({ results });
+        const results = await Posts.find().populate({
+            path: 'author',
+            select: 'username profileImage'
+        }).populate({
+                path: 'likes',
+                select: 'username profileImage'
+            });
+        return res.json({ results });
     } catch (error) {
-      return res.status(500).json({ msg: 'internl server error.' }, error.message);
+        return res.status(500).json({ msg: 'internl server error.' }, error.message);
     }
 }
 
@@ -16,9 +22,9 @@ export const getPostById = async (req, res) => {
         if (!results) {
             return res.status(404).json({ msg: 'post not found.' });
         }
-      return res.status(200).json({ results });
+        return res.status(200).json({ results });
     } catch (error) {
-       return res.status(500).json({ msg: 'internal server error.' });
+        return res.status(500).json({ msg: 'internal server error.' });
     }
 }
 
@@ -39,10 +45,10 @@ export const createPost = async (req, res) => {
                 image,
             });
             await results.save();
-           return res.status(201).json({ msg: 'posted.', results });
+            return res.status(201).json({ msg: 'posted.', results });
         });
     } catch (error) {
-       return res.status(500).json({ msg: 'internal server error.', error: error.message });
+        return res.status(500).json({ msg: 'internal server error.', error: error.message });
     }
 };
 
@@ -88,8 +94,57 @@ export const deletePost = async (req, res) => {
         if (!post) {
             return res.status(404).json({ msg: 'post not found.' });
         }
-     return res.status(200).json({ msg: 'post deleted.' });
+        return res.status(200).json({ msg: 'post deleted.' });
     } catch (error) {
-      return  res.status(500).json({ msg: 'internal server error.', error: error.message })
+        return res.status(500).json({ msg: 'internal server error.', error: error.message })
+    }
+}
+
+export const likePost = async (req, res) => {
+    try {
+        const { postId, user } = req.body;
+        if (!postId) {
+            return res.json({ msg: 'post Id is missing.' })
+        }
+        if (!user) {
+            return res.json({ msg: 'user Id is missing.' })
+        }
+        const postToLike = await Posts.findById(postId)
+        postToLike.likes.push(user)
+        await postToLike.save()
+        return res.status(200).json({ msg: 'liked.' })
+    } catch (error) {
+        return res.status(500).json({ msg: 'internal server error.' })
+    }
+}
+
+export const disLikePost = async (req, res) => {
+    try {
+        const { postId, user } = req.body;
+        if (!postId) {
+            return res.json({ msg: 'post Id is missing.' })
+        }
+        if (!user) {
+            return res.json({ msg: 'user Id is missing.' })
+        }
+        const postToDisLike = await Posts.findById(postId)
+        postToDisLike.likes = postToDisLike.likes.filter(like => like.toString() !== user.toString())
+        await postToDisLike.save()
+        return res.status(200).json({ msg: 'disliked.' })
+    } catch (error) {
+        res.status(500).json({ msg: 'internal server error.' })
+    }
+}
+
+export const comment = async (req, res) => {
+    try {
+        const { postId, author, content } = req.body;
+        const postToComentOn = await Posts.findById(postId)
+        const comment = { author, content };
+        postToComentOn.comments.push(comment)
+        await postToComentOn.save();
+        res.status(201).json({ msg: 'commented.', })
+    } catch (error) {
+        res.status(500).json({ msg: 'internal server error.', error: error.message })
     }
 }

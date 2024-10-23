@@ -13,7 +13,6 @@ app.use('/api/auth-routes', authRoutes)
 app.use('/api/post-routes', postRoutes)
 
 
-
 app.listen(port, () => {
     console.log(`server is running on port ${port}`);
 });
