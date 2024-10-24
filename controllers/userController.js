@@ -26,9 +26,9 @@ export const createUser = async (req, res) => {
             const findUserByUsername = await User.findOne({ username })
             const findUserByEmail = await User.findOne({ email })
             if (findUserByUsername) {
-                 res.json({ msg: 'username already exist.' })
+                res.json({ msg: 'username already exist.' })
             }
-            if(findUserByEmail){
+            if (findUserByEmail) {
                 res.json({ msg: 'email already exist.' })
             }
             const password = await bcrypt.hash(plainTextPassword, 10);
@@ -52,23 +52,26 @@ export const createUser = async (req, res) => {
 export const loginUser = async (req, res) => {
     try {
         let { username, password } = req.body;
-        const results = await User.findOne({ username });
-        if (!results) {
+        const user = await User.findOne({ username });
+
+        if (!user) {
             return res.status(401).json({ msg: "invalid credentials" });
         }
-        password = await bcrypt.compare(password, results.password)
-        if (!password) {
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
             return res.status(401).json({ msg: "invalid credentials" });
         }
         const token = jwt.sign(
-            { user: { id: results._id, username: results.username } },
+            { user: { id: user._id, username: user.username, role: user.role } },
             "aurora",
+            // { expiresIn: '1h' }
         );
-        res.json({ token: token, user: results.username })
+        res.json({ token, user: { username: user.username, role: user.role } });
     } catch (error) {
-        res.status(500).json({ msg: 'internal server error.' })
+        res.status(500).json({ msg: 'internal server error.' });
     }
-}
+};
 
 export const getUserById = async (req, res) => {
     try {
@@ -216,5 +219,26 @@ export const getFollowing = async (req, res) => {
         return res.status(200).json(results.following);
     } catch (error) {
         return res.status(500).json({ error: error.message });
+    }
+};
+
+export const searchUsers = async (req, res) => {
+    try {
+        const searchedValue = req.params.searchterm;
+        if (!searchedValue) {
+            return res.status(400).json({ msg: "search term is required." });
+        }
+        const result = await User.find({
+            "$or": [
+                { "content": { $regex: searchedValue, $options: 'i' } }
+            ]
+        });
+        if (result.length === 0) {
+            return res.status(404).json({ msg: "user not found." });
+        }
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ msg: "internal server error.", error: error.message });
     }
 };

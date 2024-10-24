@@ -1,5 +1,6 @@
 import Posts from "../models/Posts.js";
 import { upload } from "../middlewares/imageMiddleWare.js";
+import Notifications from "../models/Notifications.js";
 
 export const getPosts = async (req, res) => {
     try {
@@ -7,9 +8,9 @@ export const getPosts = async (req, res) => {
             path: 'author',
             select: 'username profileImage'
         }).populate({
-                path: 'likes',
-                select: 'username profileImage'
-            });
+            path: 'likes',
+            select: 'username profileImage'
+        });
         return res.json({ results });
     } catch (error) {
         return res.status(500).json({ msg: 'internl server error.' }, error.message);
@@ -139,12 +140,108 @@ export const disLikePost = async (req, res) => {
 export const comment = async (req, res) => {
     try {
         const { postId, author, content } = req.body;
-        const postToComentOn = await Posts.findById(postId)
-        const comment = { author, content };
-        postToComentOn.comments.push(comment)
-        await postToComentOn.save();
-        res.status(201).json({ msg: 'commented.', })
+        const postToCommentOn = await Posts.findById(postId);
+        if (!postToCommentOn) {
+            return res.status(404).json({ msg: 'post not found.' });
+        }
+
+        const newComment = {
+            author,  // User who is commenting
+            content
+        };
+
+        postToCommentOn.comments.push(newComment);
+        await postToCommentOn.save();
+
+        if (postToCommentOn.author.toString() !== author.toString()) {
+            await Notifications.create({
+                user: postToCommentOn.author,  // Notify the post author
+                fromUser: author,  // The user who commented
+                type: 'new_comment',
+                relatedPost: postId
+            });
+        }
+
+        res.status(201).json({ msg: 'Comment added.', comment: newComment });
     } catch (error) {
-        res.status(500).json({ msg: 'internal server error.', error: error.message })
+        res.status(500).json({ msg: 'Internal server error.', error: error.message });
     }
-}
+};
+
+
+export const deleteComment = async (req, res) => {
+    try {
+        const commentId = req.params.id;
+        const { postId } = req.body;
+        const post = await Posts.findById(postId);
+
+        if (!post) {
+            return res.status(404).json({ msg: 'post not found.' });
+        }
+        const commentIndex = post.comments.findIndex(
+            comment => comment._id.toString() === commentId
+        );
+        if (commentIndex === -1) {
+            return res.status(404).json({ msg: 'comment not found.' });
+        }
+        post.comments.splice(commentIndex, 1);
+        await post.save();
+        res.status(200).json({ msg: 'comment deleted.' });
+    } catch (error) {
+        res.status(500).json({ msg: 'internal server error.', error: error.message });
+    }
+};
+
+export const markNotificationAsRead = async (req, res) => {
+    const { notificationId, userId } = req.body;
+
+    try {
+        const notification = await Notifications.findOne({ _id: notificationId, user: userId });
+        if (!notification) {
+            return res.status(404).json({ msg: 'notification not found or does not belong to you.' });
+        }
+        notification.read = true;
+        await notification.save();
+
+        res.status(200).json({ msg: 'notification marked as read.', notification });
+    } catch (error) {
+        res.status(500).json({ msg: 'internal server error.', error: error.message });
+    }
+};
+
+export const getNotifications = async (req, res) => {
+    const { userId } = req.body;
+    try {
+        const notifications = await Notifications.find({ user: userId })
+            .populate('fromUser', 'username profileImage')
+            .populate('relatedPost', 'content image')
+            .sort({ createdAt: -1 });
+        if (!notifications.length) {
+            return res.status(404).json({ msg: 'no notifications found.' });
+        }
+        res.status(200).json({ notifications });
+    } catch (error) {
+        res.status(500).json({ msg: 'internal server error.', error: error.message });
+    }
+};
+
+export const searchPosts = async (req, res) => {
+    try {
+        const searchedValue = req.params.searchterm;
+        if (!searchedValue) {
+            return res.status(400).json({ msg: "search term is required." });
+        }
+        const result = await Posts.find({
+            "$or": [
+                { "content": { $regex: searchedValue, $options: 'i' } }
+            ]
+        });
+        if (result.length === 0) {
+            return res.status(404).json({ msg: "posts not found." });
+        }
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ msg: "internal server error.", error: error.message });
+    }
+};

@@ -8,18 +8,20 @@ import {
     getUserById,
     getUsers,
     loginUser,
+    searchUsers,
     unfollowUser,
     updateUser
 } from "../controllers/userController.js";
-import { authenticateToken } from "../middlewares/authMiddleWare.js";
+import { authenticateToken, authorizeRoles } from "../middlewares/authMiddleWare.js";
 
 const authRoutes = Router()
 
 authRoutes.get('/get-users', getUsers)
+authRoutes.get('/search-user/:searchterm', searchUsers)
 authRoutes.post('/login', loginUser)
 authRoutes.post('/create-user', createUser)
-authRoutes.put('/edit-user/:id', updateUser)
-authRoutes.delete('/delete-user/:id', deleteUser)
+authRoutes.put('/edit-user/:id', authenticateToken,authorizeRoles('Admin'), updateUser)
+authRoutes.delete('/delete-user/:id', authenticateToken,authorizeRoles('Admin'), deleteUser)
 authRoutes.get('/get-user/:id', getUserById)
 authRoutes.post('/follow/:targetUserId', authenticateToken, followUser);
 authRoutes.post('/unfollow/:targetUserId', authenticateToken, unfollowUser);
